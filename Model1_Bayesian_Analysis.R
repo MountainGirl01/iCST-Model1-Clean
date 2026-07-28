@@ -337,3 +337,39 @@ grid.newpage()
 grid.draw(table_plot)
 
 ggsave("results_table.png", table_plot, width = 12, height = 3, dpi = 300)
+
+# ============================================================
+# Combined Parameter Summary Table — All Three Models
+# ============================================================
+
+library(dplyr)
+
+# Extract full posterior summaries (includes b_*, sigma, Intercept, lprior, lp__)
+summary_primary     <- as.data.frame(posterior_summary(fit))
+summary_optimistic  <- as.data.frame(posterior_summary(fit_optimistic_original))
+summary_pessimistic <- as.data.frame(posterior_summary(fit_pessimistic_original))
+
+# Add a Parameter column (from row names) and a Model label to each
+summary_primary$Parameter     <- rownames(summary_primary)
+summary_optimistic$Parameter  <- rownames(summary_optimistic)
+summary_pessimistic$Parameter <- rownames(summary_pessimistic)
+
+summary_primary$Model     <- "Primary"
+summary_optimistic$Model  <- "Optimistic"
+summary_pessimistic$Model <- "Pessimistic"
+
+# Combine into one table
+all_params <- bind_rows(summary_primary, summary_optimistic, summary_pessimistic)
+
+# Reorder columns: Model, Parameter, Estimate, Est.Error, Q2.5, Q97.5
+all_params <- all_params %>%
+  select(Model, Parameter, Estimate, Est.Error, Q2.5, Q97.5)
+
+# Round for readability
+all_params <- all_params %>%
+  mutate(across(where(is.numeric), ~round(.x, 2)))
+
+print(all_params)
+
+# Save as CSV
+write.csv(all_params, "all_model_parameters.csv", row.names = FALSE)
