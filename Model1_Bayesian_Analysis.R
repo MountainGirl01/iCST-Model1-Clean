@@ -5,7 +5,7 @@
 # ==============================================================================
 
 # ============================================================
-# Load Libraries --------------------------------------------------------
+# Load Libraries 
 # ============================================================
 
 library(readr)
@@ -15,7 +15,7 @@ library(ggplot2)
 library(patchwork)
 
 # ============================================================
-# Import & Prepare Data --------------------------------------------------
+# Import & Prepare Data 
 # ============================================================
 
 dat <- read_csv("~/Downloads/THESIS COMBINED Complete case 26 week follow up data.csv")
@@ -32,7 +32,7 @@ dat$Randomisation <- factor(dat$Randomisation,
 table(dat$Randomisation)
 
 # ============================================================
-# Model 1: Primary Bayesian Model -----------------------------------------
+# Model 1: Primary Bayesian Model 
 # ============================================================
 
 priors <- c(
@@ -58,7 +58,7 @@ fit <- brm(
 summary(fit)
 
 # ============================================================
-# Model 2: Optimistic Bayesian Model -----------------------------------------
+# Model 2: Optimistic Bayesian Model 
 # ============================================================
 
 priors_optimistic_original <- c(
@@ -84,7 +84,7 @@ fit_optimistic_original <- brm(
 summary(fit)
 
 # ============================================================
-# Model 3: Pessimistic Bayesian Model -----------------------------------------
+# Model 3: Pessimistic Bayesian Model 
 # ============================================================
 
 priors_pessimistic_original <- c(
