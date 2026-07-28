@@ -382,17 +382,23 @@ library(brms)
 library(bayesplot)
 library(ggplot2)
 
-fit_optimistic_original <- readRDS("icst_optimistic_original.rds")
+fit <- readRDS("icst_primary_fit.rds")
 
-draws <- as_draws_array(fit_optimistic_original)
+draws <- as_draws_array(fit)
 
 combo_plot <- mcmc_combo(
   draws,
-  combo = c("dens", "trace"),
+  combo = c("dens_overlay", "trace"),
   pars  = c("b_Intercept", "b_c_BASELINE_ADAScog", "b_RandomisationiCST", "sigma")
 )
 
 combo_plot
 
-ggsave("icst_optimistic_original_combo.png", combo_plot,
+ggsave("icst_primary_fit_combo.png", combo_plot,
        width = 10, height = 8, dpi = 300)
+
+plot(fit, variable = "^b_|^sigma", regex = TRUE)
+
+png("icst_primary_fit_histtrace.png", width = 1800, height = 1200, res = 150)
+plot(fit, variable = "^b_|^sigma", regex = TRUE)
+dev.off()
