@@ -245,3 +245,95 @@ ggplot(caterpillar_df, aes(x = median, y = model, colour = model)) +
   theme(legend.position = "none")
 
 ggsave("caterpillar_plot.png", width = 10, height = 5, dpi = 300)
+
+# ============================================================
+# Complete Summary Table — All Three Models
+# ============================================================
+
+library(dplyr)
+
+# Extract posterior draws for the treatment effect from each model
+draws_primary     <- as_draws_df(fit)$b_RandomisationiCST
+draws_optimistic  <- as_draws_df(fit_optimistic_original)$b_RandomisationiCST
+draws_pessimistic <- as_draws_df(fit_pessimistic_original)$b_RandomisationiCST
+
+# Helper function to compute all stats for one set of draws
+summarise_draws <- function(draws, model_name, prior_used) {
+  data.frame(
+    Model               = model_name,
+    Prior               = prior_used,
+    Mean                = mean(draws),
+    Median              = median(draws),
+    SD                  = sd(draws),
+    CI_lower_95         = quantile(draws, 0.025),
+    CI_upper_95         = quantile(draws, 0.975),
+    P_benefit           = mean(draws < 0),                     # P(any beneficial effect)
+    P_harm              = mean(draws > 0),                     # P(any harmful effect)
+    P_clinically_meaningful = mean(draws < -1.5),               # adjust threshold if you have one
+    row.names = NULL
+  )
+}
+
+results_table <- bind_rows(
+  summarise_draws(draws_optimistic,  "Optimistic",  "Normal(-2.9, 2)"),
+  summarise_draws(draws_primary,     "Primary",     "Normal(-1.92, 2)"),
+  summarise_draws(draws_pessimistic, "Pessimistic", "Normal(-0.5, 2)")
+)
+
+# Round for readability
+results_table_rounded <- results_table %>%
+  mutate(across(where(is.numeric), ~round(.x, 3)))
+
+print(results_table_rounded)
+
+# Save as CSV
+write_csv(results_table_rounded, "icst_results_summary_table.csv")
+
+# ============================================================
+# Add convergence diagnostics (Rhat, Bulk_ESS, Tail_ESS)
+# ============================================================
+
+extract_diagnostics <- function(fit, model_name) {
+  s <- summary(fit)$fixed["RandomisationiCST", ]
+  data.frame(
+    Model     = model_name,
+    Est_Error = s["Est.Error"],
+    Rhat      = s["Rhat"],
+    Bulk_ESS  = s["Bulk_ESS"],
+    Tail_ESS  = s["Tail_ESS"],
+    row.names = NULL
+  )
+}
+
+diagnostics_table <- bind_rows(
+  extract_diagnostics(fit_optimistic_original,  "Optimistic"),
+  extract_diagnostics(fit,                       "Primary"),
+  extract_diagnostics(fit_pessimistic_original,  "Pessimistic")
+)
+
+# Merge with results table
+full_results_table <- results_table_rounded %>%
+  left_join(diagnostics_table, by = "Model") %>%
+  mutate(across(where(is.numeric), ~round(.x, 3)))
+
+print(full_results_table)
+write_csv(full_results_table, "icst_full_results_table.csv")
+
+# ============================================================
+# Render results table as a plot (in RStudio Plots pane)
+# ============================================================
+
+library(gridExtra)
+library(grid)
+
+# Uses results_table_rounded from the previous step
+table_plot <- tableGrob(results_table_rounded, rows = NULL,
+                        theme = ttheme_minimal(
+                          core = list(fg_params = list(cex = 0.8)),
+                          colhead = list(fg_params = list(cex = 0.85, fontface = "bold"))
+                        ))
+
+grid.newpage()
+grid.draw(table_plot)
+
+ggsave("results_table.png", table_plot, width = 12, height = 3, dpi = 300)

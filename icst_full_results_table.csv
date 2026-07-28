@@ -1,0 +1,4 @@
+Model,Prior,Mean,Median,SD,CI_lower_95,CI_upper_95,P_benefit,P_harm,P_clinically_meaningful,Est.Error,Rhat,Bulk_ESS,Tail_ESS
+Optimistic,"Normal(-2.9, 2)",-1.081,-1.095,0.666,-2.378,0.236,0.947,0.053,0.261,0.666,1.001,3995.232,2903.179
+Primary,"Normal(-1.92, 2)",-1,-0.997,0.667,-2.314,0.317,0.933,0.067,0.231,0.667,1.001,4502.812,3144.095
+Pessimistic,"Normal(-0.5, 2)",-0.796,-0.805,0.654,-2.066,0.509,0.881,0.119,0.136,0.654,1,4474.883,2803.056
