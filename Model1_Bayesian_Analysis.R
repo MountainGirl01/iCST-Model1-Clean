@@ -373,3 +373,26 @@ print(all_params)
 
 # Save as CSV
 write.csv(all_params, "all_model_parameters.csv", row.names = FALSE)
+
+# ============================================================
+# Posterior Densities and Trace Plots
+# ============================================================
+
+library(brms)
+library(bayesplot)
+library(ggplot2)
+
+fit_optimistic_original <- readRDS("icst_optimistic_original.rds")
+
+draws <- as_draws_array(fit_optimistic_original)
+
+combo_plot <- mcmc_combo(
+  draws,
+  combo = c("dens", "trace"),
+  pars  = c("b_Intercept", "b_c_BASELINE_ADAScog", "b_RandomisationiCST", "sigma")
+)
+
+combo_plot
+
+ggsave("icst_optimistic_original_combo.png", combo_plot,
+       width = 10, height = 8, dpi = 300)
