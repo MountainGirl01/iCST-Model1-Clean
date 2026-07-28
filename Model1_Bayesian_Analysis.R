@@ -54,3 +54,50 @@ fit <- brm(
 )
 
 summary(fit)
+
+# Model 2: Optimistic Bayesian Model -----------------------------------------
+
+priors_optimistic_original <- c(
+  prior(normal(20, 7),    class = Intercept),
+  prior(normal(0.5, 0.3), class = b, coef = c_BASELINE_ADAScog),
+  prior(normal(-2.9, 2),  class = b, coef = RandomisationiCST),
+  prior(exponential(0.1), class = sigma)
+)
+
+fit_optimistic_original <- brm(
+  formula = ADAS_20_FU2 ~ c_BASELINE_ADAScog + Randomisation,
+  data    = dat,
+  family  = gaussian(),
+  prior   = priors_optimistic_original,
+  chains  = 4,
+  iter    = 2000,
+  warmup  = 1000,
+  cores   = 4,
+  seed    = 42,
+  file    = "icst_optimistic_original"
+)
+
+summary(fit)
+
+# Model 3: Pessimistic Bayesian Model -----------------------------------------
+
+priors_pessimistic_original <- c(
+  prior(normal(20, 7),    class = Intercept),
+  prior(normal(0.5, 0.3), class = b, coef = c_BASELINE_ADAScog),
+  prior(normal(-0.5, 2),  class = b, coef = RandomisationiCST),
+  prior(exponential(0.1), class = sigma)
+
+fit_pessimistic_original <- brm(
+    formula = ADAS_20_FU2 ~ c_BASELINE_ADAScog + Randomisation,
+    data    = dat,
+    family  = gaussian(),
+    prior   = priors_pessimistic_original,
+    chains  = 4,
+    iter    = 2000,
+    warmup  = 1000,
+    cores   = 4,
+    seed    = 42,
+    file    = "icst_pessimistic_original"
+)
+
+summary(fit)
