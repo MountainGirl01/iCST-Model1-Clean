@@ -4,8 +4,9 @@
 # Predictors: Baseline-centred ADAS-Cog, Randomisation (iCST vs TAU Control)
 # ==============================================================================
 
-
+# ============================================================
 # Load Libraries --------------------------------------------------------
+# ============================================================
 
 library(readr)
 library(brms)
@@ -13,8 +14,9 @@ library(bayesplot)
 library(ggplot2)
 library(patchwork)
 
-
+# ============================================================
 # Import & Prepare Data --------------------------------------------------
+# ============================================================
 
 dat <- read_csv("~/Downloads/THESIS COMBINED Complete case 26 week follow up data.csv")
 
@@ -29,9 +31,9 @@ dat$Randomisation <- factor(dat$Randomisation,
                             levels = c("TAU Control", "iCST"))
 table(dat$Randomisation)
 
-
+# ============================================================
 # Model 1: Primary Bayesian Model -----------------------------------------
-# Weakly-informative priors, primary treatment effect prior centred on -1.92
+# ============================================================
 
 priors <- c(
   prior(normal(20, 7),    class = Intercept),
@@ -55,7 +57,9 @@ fit <- brm(
 
 summary(fit)
 
+# ============================================================
 # Model 2: Optimistic Bayesian Model -----------------------------------------
+# ============================================================
 
 priors_optimistic_original <- c(
   prior(normal(20, 7),    class = Intercept),
@@ -79,13 +83,16 @@ fit_optimistic_original <- brm(
 
 summary(fit)
 
+# ============================================================
 # Model 3: Pessimistic Bayesian Model -----------------------------------------
+# ============================================================
 
 priors_pessimistic_original <- c(
   prior(normal(20, 7),    class = Intercept),
   prior(normal(0.5, 0.3), class = b, coef = c_BASELINE_ADAScog),
   prior(normal(-0.5, 2),  class = b, coef = RandomisationiCST),
   prior(exponential(0.1), class = sigma)
+)
 
 fit_pessimistic_original <- brm(
     formula = ADAS_20_FU2 ~ c_BASELINE_ADAScog + Randomisation,
@@ -101,3 +108,140 @@ fit_pessimistic_original <- brm(
 )
 
 summary(fit)
+
+# ============================================================
+# Run predictive checks
+# ============================================================
+
+p_prior <- pp_check(fit_prior_original, ndraws = 100) +
+  ggtitle("Prior Predictive Check — Original Intercept Normal(20, 7)") +
+  xlab("ADAS-Cog score") +
+  xlim(-20, 80) +
+  theme_minimal()
+
+p_posterior <- pp_check(fit_original, ndraws = 100) +
+  ggtitle("Posterior Predictive Check") +
+  xlab("ADAS-Cog score") +
+  xlim(-20, 80) +
+  theme_minimal()
+
+p_prior + p_posterior
+
+ggsave("predictive_checks_original.png", width = 12, height = 5, dpi = 300)
+
+# ============================================================
+# Overlaid Posterior Distributions with Probability Labels
+# ============================================================
+
+# Extract posterior draws for the treatment effect from each model
+draws_primary     <- as_draws_df(fit)$b_RandomisationiCST
+draws_optimistic  <- as_draws_df(fit_optimistic_original)$b_RandomisationiCST
+draws_pessimistic <- as_draws_df(fit_pessimistic_original)$b_RandomisationiCST
+
+# Combine into one data frame for plotting
+draws_df <- data.frame(
+  value = c(draws_primary, draws_optimistic, draws_pessimistic),
+  model = rep(c("Primary (−1.92)", "Optimistic (−2.9)", "Pessimistic (−0.5)"),
+              each = length(draws_primary))
+)
+draws_df$model <- factor(draws_df$model,
+                         levels = c("Optimistic (−2.9)", "Primary (−1.92)", "Pessimistic (−0.5)"))
+
+# Posterior probability of benefit (treatment effect < 0) for each model
+p_benefit_primary     <- mean(draws_primary < 0)
+p_benefit_optimistic  <- mean(draws_optimistic < 0)
+p_benefit_pessimistic <- mean(draws_pessimistic < 0)
+
+ggplot(draws_df, aes(x = value, fill = model, colour = model)) +
+  geom_density(alpha = 0.3) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "red", linewidth = 0.8) +
+  annotate("text", x = 0.15, y = 0.58, label = "No effect",
+           colour = "red", size = 3.5, hjust = 0) +
+  annotate("text", x = -5.5, y = 0.50,
+           label = paste0("Optimistic: P(benefit) = ", round(p_benefit_optimistic * 100, 1), "%"),
+           colour = "#F8766D", size = 3.2, hjust = 0) +
+  annotate("text", x = -5.5, y = 0.45,
+           label = paste0("Primary: P(benefit) = ", round(p_benefit_primary * 100, 1), "%"),
+           colour = "#619CFF", size = 3.2, hjust = 0) +
+  annotate("text", x = -5.5, y = 0.40,
+           label = paste0("Pessimistic: P(benefit) = ", round(p_benefit_pessimistic * 100, 1), "%"),
+           colour = "#00BA38", size = 3.2, hjust = 0) +
+  labs(
+    title    = "Posterior distribution of iCST treatment effect on ADAS-Cog",
+    subtitle = "By prior specification",
+    x        = "Treatment effect (ADAS-Cog points)",
+    y        = "Density",
+    fill     = "Prior specification",
+    colour   = "Prior specification",
+    caption  = "Negative values indicate improvement (lower ADAS-Cog = better cognitive function).\nP(benefit) = posterior probability of any beneficial effect of iCST versus TAU Control.\nRed dashed line = no effect (0 points)."
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+ggsave("posterior_distribution.png", width = 10, height = 6, dpi = 300)
+
+# ============================================================
+# Prior and Posterior Predictive Check Plots
+# ============================================================
+
+fit_prior_only <- brm(
+  formula = ADAS_20_FU2 ~ c_BASELINE_ADAScog + Randomisation,
+  data    = dat,
+  family  = gaussian(),
+  prior   = priors,
+  sample_prior = "only",
+  chains  = 4,
+  iter    = 2000,
+  warmup  = 1000,
+  cores   = 4,
+  seed    = 42,
+  file    = "icst_prior_only",
+  file_refit = "on_change"
+)
+p_prior <- pp_check(fit_prior_only, ndraws = 100) +
+  ggtitle("Prior Predictive Check") +
+  xlab("ADAS-Cog score") +
+  xlim(-20, 80) +
+  theme_minimal()
+p_posterior <- pp_check(fit, ndraws = 100) +
+  ggtitle("Posterior Predictive Check") +
+  xlab("ADAS-Cog score") +
+  xlim(-20, 80) +
+  theme_minimal()
+p_prior + p_posterior
+ggsave("predictive_checks.png", width = 12, height = 5, dpi = 300)
+
+# ============================================================
+# Caterpillar Plot — Treatment Effect Across Prior Specifications (95% CI)
+# ============================================================
+
+draws_primary     <- as_draws_df(fit)$b_RandomisationiCST
+draws_optimistic  <- as_draws_df(fit_optimistic_original)$b_RandomisationiCST
+draws_pessimistic <- as_draws_df(fit_pessimistic_original)$b_RandomisationiCST
+
+caterpillar_df <- data.frame(
+  model = c("Optimistic (−2.9)", "Primary (−1.92)", "Pessimistic (−0.5)"),
+  median = c(median(draws_optimistic), median(draws_primary), median(draws_pessimistic)),
+  ci_lower = c(quantile(draws_optimistic, 0.025), quantile(draws_primary, 0.025), quantile(draws_pessimistic, 0.025)),
+  ci_upper = c(quantile(draws_optimistic, 0.975), quantile(draws_primary, 0.975), quantile(draws_pessimistic, 0.975))
+)
+
+caterpillar_df$model <- factor(caterpillar_df$model,
+                               levels = c("Pessimistic (−0.5)", "Primary (−1.92)", "Optimistic (−2.9)"))
+
+ggplot(caterpillar_df, aes(x = median, y = model, colour = model)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "red", linewidth = 0.8) +
+  geom_segment(aes(x = ci_lower, xend = ci_upper, y = model, yend = model),
+               linewidth = 1.2) +
+  geom_point(size = 3, colour = "black") +
+  labs(
+    title    = "Treatment effect on ADAS-Cog by prior specification",
+    subtitle = "Posterior median with 95% credible intervals",
+    x        = "Treatment effect (ADAS-Cog points)",
+    y        = NULL,
+    caption  = "Negative values indicate improvement on ADAS-Cog."
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+ggsave("caterpillar_plot.png", width = 10, height = 5, dpi = 300)
