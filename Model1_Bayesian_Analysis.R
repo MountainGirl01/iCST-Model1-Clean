@@ -447,3 +447,76 @@ ggplot(caterpillar_df, aes(x = median, y = model)) +
   )
 
 ggsave("caterpillar_plot.png", width = 10, height = 5, dpi = 300)
+
+# ============================================================
+# Thesis Ready Posterior Distribution Plot
+# ============================================================
+
+# Extract posterior draws for the treatment effect from each model
+draws_primary     <- as_draws_df(fit)$b_RandomisationiCST
+draws_optimistic  <- as_draws_df(fit_optimistic_original)$b_RandomisationiCST
+draws_pessimistic <- as_draws_df(fit_pessimistic_original)$b_RandomisationiCST
+
+# Combine into one data frame for plotting
+draws_df <- data.frame(
+  value = c(draws_primary, draws_optimistic, draws_pessimistic),
+  model = rep(c("Primary (−1.92)", "Optimistic (−2.9)", "Pessimistic (−0.5)"),
+              each = length(draws_primary))
+)
+
+draws_df$model <- factor(draws_df$model,
+                         levels = c("Optimistic (−2.9)", "Primary (−1.92)", "Pessimistic (−0.5)"))
+
+# Posterior probability of benefit (treatment effect < 0) for each model
+p_benefit_primary     <- mean(draws_primary < 0)
+p_benefit_optimistic  <- mean(draws_optimistic < 0)
+p_benefit_pessimistic <- mean(draws_pessimistic < 0)
+
+ggplot(draws_df, aes(x = value, fill = model, colour = model)) +
+  geom_density(alpha = 0.3) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "black", linewidth = 0.6) +
+  annotate("text", x = 0.15, y = 0.58, label = "No effect",
+           colour = "black", size = 3.2, hjust = 0, family = "Arial") +
+  scale_fill_manual(values = c(
+    "Optimistic (−2.9)"  = "#00BA38",
+    "Primary (−1.92)"    = "#619CFF",
+    "Pessimistic (−0.5)" = "#F8766D"
+  )) +
+  scale_colour_manual(values = c(
+    "Optimistic (−2.9)"  = "#00BA38",
+    "Primary (−1.92)"    = "#619CFF",
+    "Pessimistic (−0.5)" = "#F8766D"
+  )) +
+  labs(
+    title    = "Posterior Distribution of iCST Treatment Effect on ADAS-Cog",
+    subtitle = "By prior specification",
+    x        = "Treatment effect (ADAS-Cog points)",
+    y        = "Density",
+    fill     = "Prior specification",
+    colour   = "Prior specification"
+  ) +
+  theme_minimal(base_family = "Arial", base_size = 11) +
+  theme(
+    legend.position   = "right",
+    legend.direction  = "vertical",
+    legend.title      = element_text(size = 11, face = "bold"),
+    legend.text       = element_text(size = 11),
+    plot.title        = element_text(face = "bold", hjust = 0, size = 11),
+    plot.subtitle     = element_text(hjust = 0, size = 11, colour = "grey30"),
+    axis.title        = element_text(size = 11, face = "bold"),
+    axis.text         = element_text(size = 11, colour = "black"),
+    axis.line         = element_line(colour = "black"),
+    panel.grid.minor  = element_blank()
+  ) +
+  guides(fill = guide_legend(ncol = 1), colour = guide_legend(ncol = 1))
+
+ggsave("posterior_distribution.png", width = 11, height = 6, dpi = 300)
+
+# ---------------------------------------------------------------------------
+# Print P(benefit) values to console so you can copy them into your
+# APA 7 figure note underneath the image (see note text below)
+# ---------------------------------------------------------------------------
+cat("Optimistic: P(benefit) =", round(p_benefit_optimistic * 100, 1), "%\n")
+cat("Primary: P(benefit) =", round(p_benefit_primary * 100, 1), "%\n")
+cat("Pessimistic: P(benefit) =", round(p_benefit_pessimistic * 100, 1), "%\n")
+
