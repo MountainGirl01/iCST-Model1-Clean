@@ -81,7 +81,7 @@ fit_optimistic_original <- brm(
   file    = "icst_optimistic_original"
 )
 
-summary(fit)
+summary(fit_optimistic_original)
 
 # ============================================================
 # Model 3: Pessimistic Bayesian Model 
@@ -107,7 +107,7 @@ fit_pessimistic_original <- brm(
     file    = "icst_pessimistic_original"
 )
 
-summary(fit)
+summary(fit_pessimistic_original)
 
 # ============================================================
 # Run predictive checks
