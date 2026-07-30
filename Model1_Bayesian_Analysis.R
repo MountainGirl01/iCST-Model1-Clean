@@ -423,8 +423,7 @@ caterpillar_df$model <- factor(caterpillar_df$model,
 
 ggplot(caterpillar_df, aes(x = median, y = model)) +
   geom_vline(xintercept = 0, linetype = "dashed", colour = "black", linewidth = 0.6) +
-  geom_segment(aes(x = ci_lower, xend = ci_upper, y = model, yend = model),
-               linewidth = 1, colour = "black") +
+  geom_errorbarh(aes(xmin = ci_lower, xmax = ci_upper), height = 0.15, linewidth = 0.8, colour = "black") +
   geom_point(size = 3, colour = "black", fill = "black", shape = 21) +
   labs(
     title    = "Treatment Effect on ADAS-Cog by Prior Specification",
