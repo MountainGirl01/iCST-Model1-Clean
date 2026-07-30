@@ -402,3 +402,49 @@ plot(fit, variable = "^b_|^sigma", regex = TRUE)
 png("icst_primary_fit_histtrace.png", width = 1800, height = 1200, res = 150)
 plot(fit, variable = "^b_|^sigma", regex = TRUE)
 dev.off()
+
+# ============================================================
+# CI Forest Plot
+# ============================================================
+
+draws_primary     <- as_draws_df(fit)$b_RandomisationiCST
+draws_optimistic  <- as_draws_df(fit_optimistic_original)$b_RandomisationiCST
+draws_pessimistic <- as_draws_df(fit_pessimistic_original)$b_RandomisationiCST
+
+caterpillar_df <- data.frame(
+  model = c("Optimistic (−2.9)", "Primary (−1.92)", "Pessimistic (−0.5)"),
+  median = c(median(draws_optimistic), median(draws_primary), median(draws_pessimistic)),
+  ci_lower = c(quantile(draws_optimistic, 0.025), quantile(draws_primary, 0.025), quantile(draws_pessimistic, 0.025)),
+  ci_upper = c(quantile(draws_optimistic, 0.975), quantile(draws_primary, 0.975), quantile(draws_pessimistic, 0.975))
+)
+
+caterpillar_df$model <- factor(caterpillar_df$model,
+                               levels = c("Pessimistic (−0.5)", "Primary (−1.92)", "Optimistic (−2.9)"))
+
+ggplot(caterpillar_df, aes(x = median, y = model)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "black", linewidth = 0.6) +
+  geom_segment(aes(x = ci_lower, xend = ci_upper, y = model, yend = model),
+               linewidth = 1, colour = "black") +
+  geom_point(size = 3, colour = "black", fill = "black", shape = 21) +
+  labs(
+    title    = "Treatment Effect on ADAS-Cog by Prior Specification",
+    subtitle = "Posterior median with 95% credible intervals",
+    x        = "Treatment effect (ADAS-Cog points)",
+    y        = "Prior specification",
+    caption  = "Note. Negative values indicate improvement on ADAS-Cog. Error bars represent 95% credible intervals."
+  ) +
+  theme_minimal(base_family = "Arial", base_size = 11) +
+  theme(
+    legend.position   = "none",
+    plot.title        = element_text(face = "bold", hjust = 0, size = 11),
+    plot.subtitle     = element_text(hjust = 0, size = 11, colour = "grey30"),
+    plot.caption      = element_text(hjust = 0, size = 11, colour = "grey30", face = "italic"),
+    axis.title        = element_text(size = 11, face = "bold"),
+    axis.text         = element_text(size = 11, colour = "black"),
+    axis.line         = element_line(colour = "black"),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor  = element_blank(),
+    panel.grid.major.x = element_line(colour = "grey85", linewidth = 0.3)
+  )
+
+ggsave("caterpillar_plot.png", width = 10, height = 5, dpi = 300)
