@@ -520,3 +520,121 @@ cat("Optimistic: P(benefit) =", round(p_benefit_optimistic * 100, 1), "%\n")
 cat("Primary: P(benefit) =", round(p_benefit_primary * 100, 1), "%\n")
 cat("Pessimistic: P(benefit) =", round(p_benefit_pessimistic * 100, 1), "%\n")
 
+# ============================================================
+# Create Demographics Table for Model 1
+# ============================================================
+
+pwd_table <- dat_table1 |>
+  select(
+    Randomisation,
+    pwd_female,
+    cRelAgeP,
+    BASELINE_ADAS_20,
+    pwd_white,
+    relationship_spouse,
+    relationship_child
+  ) |>
+  tbl_summary(
+    by = Randomisation,
+    
+    type = list(
+      pwd_female ~ "dichotomous",
+      pwd_white ~ "dichotomous",
+      relationship_spouse ~ "dichotomous",
+      relationship_child ~ "dichotomous"
+    ),
+    
+    value = list(
+      pwd_female ~ "Yes",
+      pwd_white ~ "Yes",
+      relationship_spouse ~ "Yes",
+      relationship_child ~ "Yes"
+    ),
+    
+    statistic = list(
+      all_continuous() ~ "{mean} ({sd})",
+      all_dichotomous() ~ "{n} ({p}%)"
+    ),
+    
+    digits = list(
+      all_continuous() ~ 1,
+      all_dichotomous() ~ c(0, 1)
+    ),
+    
+    missing = "no",
+    
+    label = list(
+      pwd_female ~ "Female, n (%)",
+      cRelAgeP ~ "Age, years, mean (SD)",
+      BASELINE_ADAS_20 ~ "Baseline ADAS-Cog, mean (SD)",
+      pwd_white ~ "White ethnicity, n (%)",
+      relationship_spouse ~ "Caregiver relationship: spouse, n (%)",
+      relationship_child ~ "Caregiver relationship: son/daughter, n (%)"
+    )
+  )
+
+caregiver_table <- dat_table1 |>
+  select(
+    Randomisation,
+    caregiver_female,
+    cRelAgeC,
+    caregiver_white
+  ) |>
+  tbl_summary(
+    by = Randomisation,
+    
+    type = list(
+      caregiver_female ~ "dichotomous",
+      caregiver_white ~ "dichotomous"
+    ),
+    
+    value = list(
+      caregiver_female ~ "Yes",
+      caregiver_white ~ "Yes"
+    ),
+    
+    statistic = list(
+      all_continuous() ~ "{mean} ({sd})",
+      all_dichotomous() ~ "{n} ({p}%)"
+    ),
+    
+    digits = list(
+      all_continuous() ~ 1,
+      all_dichotomous() ~ c(0, 1)
+    ),
+    
+    missing = "no",
+    
+    label = list(
+      caregiver_female ~ "Female, n (%)",
+      cRelAgeC ~ "Age, years, mean (SD)",
+      caregiver_white ~ "White ethnicity, n (%)"
+    )
+  )
+
+table1 <- tbl_stack(
+  tbls = list(
+    pwd_table,
+    caregiver_table
+  ),
+  group_header = c(
+    "**Person with dementia**",
+    "**Caregiver**"
+  )
+) |>
+  modify_header(
+    label ~ "**Characteristic**",
+    stat_1 ~ "**Treatment group  \nN = {n}**",
+    stat_2 ~ "**Control group  \nN = {n}**"
+  ) |>
+  modify_caption(
+    "**Table 1. Baseline Characteristics of People With Dementia and Their Caregivers**"
+  ) |>
+  modify_footnote(
+    all_stat_cols() ~
+      "Values are presented as mean (SD) or n (%). Percentages use available data for each variable."
+  ) |>
+  bold_labels()
+
+table1
+
