@@ -521,7 +521,7 @@ cat("Primary: P(benefit) =", round(p_benefit_primary * 100, 1), "%\n")
 cat("Pessimistic: P(benefit) =", round(p_benefit_pessimistic * 100, 1), "%\n")
 
 # ============================================================
-# Create Demographics Table for Model 1
+# Create Characteristics Table for Model 1
 # ============================================================
 
 pwd_table <- dat_table1 |>
