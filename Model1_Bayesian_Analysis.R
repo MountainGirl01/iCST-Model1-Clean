@@ -638,3 +638,311 @@ table1 <- tbl_stack(
 
 table1
 
+# ============================================================
+# Model 1 v 2 - Change Priors to Informative and Skeptical 
+# ============================================================
+
+## ============================================================================
+## iCST Model 1: Bayesian Analysis of Treatment Effect on ADAS-Cog
+## Outcome: ADAS_20_FU2 (26-week follow-up)
+## Predictors: Baseline-centred ADAS-Cog, Randomisation (iCST vs TAU Control)
+## Two-prior structure: Informative vs Skeptical
+## ============================================================================
+
+# ---- LIBRARIES ---------------------------------------------------------
+library(readr)
+library(brms)
+library(bayesplot)
+library(ggplot2)
+library(patchwork)
+library(dplyr)
+library(tidybayes)
+library(gt)
+
+# ---- IMPORT & PREPARE DATA ----------------------------------------------
+dat <- read_csv("~/Downloads/THESIS COMBINED Complete case 26 week follow up data.csv")
+
+dat$Randomisation <- factor(dat$Randomisation,
+                            levels = c("TAU Control", "iCST"))
+
+table(dat$Randomisation)
+range(dat$ADAS_20_FU2, na.rm = TRUE)
+summary(dat$ADAS_20_FU2)
+
+# ---- TRUNCATED FORMULA ---------------------------------------------------
+# Bounds set to 0-60: true floor is 0, ceiling padded above the
+# observed max (55.67) to avoid cutting off real/predicted values.
+adas_formula_trunc <- bf(ADAS_20_FU2 | trunc(lb = 0, ub = 60) ~
+                           c_BASELINE_ADAScog + Randomisation)
+
+# ---- FINAL PRIORS ---------------------------------------------------------
+# Sigma: normal(9,3) truncated at 0 - centred near the plausible
+# residual SD rather than at 0, avoiding unrealistic near-zero draws.
+
+priors_informative_final <- c(
+  prior(normal(20, 4),    class = Intercept),
+  prior(normal(0.5, 0.3), class = b, coef = c_BASELINE_ADAScog),
+  prior(normal(-1.92, 2), class = b, coef = RandomisationiCST),
+  prior(normal(9, 3),     class = sigma, lb = 0)
+)
+
+priors_skeptical_final <- c(
+  prior(normal(20, 4),    class = Intercept),
+  prior(normal(0.5, 0.3), class = b, coef = c_BASELINE_ADAScog),
+  prior(normal(0, 2),     class = b, coef = RandomisationiCST),
+  prior(normal(9, 3),     class = sigma, lb = 0)
+)
+
+# ---- FIT BOTH MODELS -------------------------------------------------------
+
+fit_informative_final <- brm(
+  formula = adas_formula_trunc,
+  data    = dat,
+  family  = gaussian(),
+  prior   = priors_informative_final,
+  chains  = 4,
+  iter    = 4000,
+  warmup  = 2000,
+  cores   = 4,
+  seed    = 42,
+  control = list(adapt_delta = 0.95),
+  file    = "icst_model1_informative_final"
+)
+
+fit_skeptical_final <- brm(
+  formula = adas_formula_trunc,
+  data    = dat,
+  family  = gaussian(),
+  prior   = priors_skeptical_final,
+  chains  = 4,
+  iter    = 4000,
+  warmup  = 2000,
+  cores   = 4,
+  seed    = 42,
+  control = list(adapt_delta = 0.95),
+  file    = "icst_model1_skeptical_final"
+)
+
+summary(fit_informative_final)
+summary(fit_skeptical_final)
+
+# ---- CONVERGENCE DIAGNOSTICS ------------------------------------------------
+
+cat("Max Rhat (Informative):", round(max(brms::rhat(fit_informative_final)), 4), "\n")
+cat("Max Rhat (Skeptical):", round(max(brms::rhat(fit_skeptical_final)), 4), "\n")
+
+div_informative <- sum(subset(brms::nuts_params(fit_informative_final),
+                              Parameter == "divergent__")$Value)
+div_skeptical <- sum(subset(brms::nuts_params(fit_skeptical_final),
+                            Parameter == "divergent__")$Value)
+
+cat("Divergent transitions (Informative):", div_informative, "\n")
+cat("Divergent transitions (Skeptical):", div_skeptical, "\n")
+
+# ---- PRIOR PREDICTIVE MODELS (for predictive check plots) ------------------
+
+prior_check_informative_final <- brm(
+  formula = adas_formula_trunc, data = dat, family = gaussian(),
+  prior = priors_informative_final, sample_prior = "only",
+  chains = 4, iter = 1000, seed = 42
+)
+
+prior_check_skeptical_final <- brm(
+  formula = adas_formula_trunc, data = dat, family = gaussian(),
+  prior = priors_skeptical_final, sample_prior = "only",
+  chains = 4, iter = 1000, seed = 42
+)
+
+# ---- PRIOR + POSTERIOR PREDICTIVE CHECK PLOTS (combined 2x2) ---------------
+
+p_prior_inf <- brms::pp_check(prior_check_informative_final, ndraws = 100) +
+  labs(title = "Prior Predictive Check", subtitle = "Informative prior",
+       x = "ADAS-Cog score", y = "Density") + theme_minimal()
+
+p_post_inf <- brms::pp_check(fit_informative_final, ndraws = 100) +
+  labs(title = "Posterior Predictive Check", subtitle = "Informative prior",
+       x = "ADAS-Cog score", y = "Density") + theme_minimal()
+
+p_prior_skep <- brms::pp_check(prior_check_skeptical_final, ndraws = 100) +
+  labs(title = "Prior Predictive Check", subtitle = "Skeptical prior",
+       x = "ADAS-Cog score", y = "Density") + theme_minimal()
+
+p_post_skep <- brms::pp_check(fit_skeptical_final, ndraws = 100) +
+  labs(title = "Posterior Predictive Check", subtitle = "Skeptical prior",
+       x = "ADAS-Cog score", y = "Density") + theme_minimal()
+
+combined_ppc <- (p_prior_inf | p_post_inf) / (p_prior_skep | p_post_skep) +
+  plot_annotation(
+    title = "Model 1 (Final): Prior and Posterior Predictive Checks",
+    theme = theme(plot.title = element_text(face = "italic", size = 13))
+  )
+
+combined_ppc
+ggsave("model1_ppc_final_all.png", combined_ppc, width = 10, height = 9, dpi = 300)
+
+# ---- OVERLAID POSTERIOR DISTRIBUTION PLOT -----------------------------------
+
+draws_informative <- as_draws_df(fit_informative_final) %>%
+  select(b_RandomisationiCST) %>%
+  mutate(Prior = "Informative")
+
+draws_skeptical <- as_draws_df(fit_skeptical_final) %>%
+  select(b_RandomisationiCST) %>%
+  mutate(Prior = "Skeptical")
+
+all_draws_m1 <- bind_rows(draws_informative, draws_skeptical)
+all_draws_m1$Prior <- factor(all_draws_m1$Prior, levels = c("Informative", "Skeptical"))
+
+prob_labels_m1 <- all_draws_m1 %>%
+  group_by(Prior) %>%
+  summarise(prob_benefit = mean(b_RandomisationiCST < 0), .groups = "drop") %>%
+  mutate(label = paste0(Prior, ": P(benefit) = ",
+                        scales::percent(prob_benefit, accuracy = 0.1)))
+
+print(prob_labels_m1)
+
+overlay_plot_m1 <- ggplot(all_draws_m1, aes(x = b_RandomisationiCST, fill = Prior)) +
+  geom_density(alpha = 0.45, color = NA) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red", linewidth = 0.8) +
+  annotate("text", x = 0.15, y = Inf, label = "No effect",
+           color = "red", hjust = 0, vjust = 1.5, size = 3.5) +
+  annotate("text", x = -4, y = Inf,
+           label = prob_labels_m1$label[prob_labels_m1$Prior == "Informative"],
+           color = "#4E9FDA", hjust = 0, vjust = 3, size = 3.5) +
+  annotate("text", x = -4, y = Inf,
+           label = prob_labels_m1$label[prob_labels_m1$Prior == "Skeptical"],
+           color = "#4CAF50", hjust = 0, vjust = 5, size = 3.5) +
+  scale_fill_manual(values = c("Informative" = "#4E9FDA", "Skeptical" = "#4CAF50"),
+                    labels = c("Informative" = "Informative (\u22121.92)",
+                               "Skeptical" = "Skeptical (0)")) +
+  labs(
+    title = "Posterior distribution of iCST treatment effect on ADAS-Cog",
+    subtitle = "By prior specification",
+    x = "Treatment effect (ADAS-Cog points)", y = "Density",
+    fill = "Prior specification",
+    caption = "Negative values indicate improvement (lower ADAS-Cog = better cognitive function).\nP(benefit) = posterior probability of any beneficial effect of iCST versus TAU Control.\nRed dashed line = no effect (0 points)."
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom", plot.caption = element_text(hjust = 0, size = 8, color = "grey40")) +
+  coord_cartesian(clip = "off")
+
+overlay_plot_m1
+ggsave("model1_posterior_treatment_effect_revised.png", overlay_plot_m1,
+       width = 9, height = 6, dpi = 300)
+
+# ---- FOREST PLOT -------------------------------------------------------------
+
+draws_inf <- as_draws_df(fit_informative_final)$b_RandomisationiCST
+draws_skep <- as_draws_df(fit_skeptical_final)$b_RandomisationiCST
+
+forest_data <- tibble::tibble(
+  Model = c("Informative", "Skeptical"),
+  Median = c(median(draws_inf), median(draws_skep)),
+  CI_lower_95 = c(quantile(draws_inf, 0.025), quantile(draws_skep, 0.025)),
+  CI_upper_95 = c(quantile(draws_inf, 0.975), quantile(draws_skep, 0.975))
+) %>%
+  mutate(Model = factor(Model, levels = c("Skeptical", "Informative")))
+
+forest_plot <- ggplot(forest_data, aes(x = Median, y = Model, color = Model)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red", linewidth = 0.8) +
+  geom_errorbarh(aes(xmin = CI_lower_95, xmax = CI_upper_95), height = 0, linewidth = 1) +
+  geom_point(size = 3, color = "black") +
+  scale_color_manual(values = c("Informative" = "#4E9FDA", "Skeptical" = "#4CAF50")) +
+  labs(
+    title = "Treatment effect on ADAS-Cog by prior specification",
+    subtitle = "Posterior median with 95% credible intervals",
+    x = "Treatment effect (ADAS-Cog points)", y = NULL,
+    caption = "Negative values indicate improvement on ADAS-Cog."
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none", plot.caption = element_text(hjust = 1, size = 8, color = "grey40"))
+
+forest_plot
+ggsave("model1_forest_plot_revised.png", forest_plot, width = 8, height = 4, dpi = 300)
+
+# ---- FULL RESULTS TABLE (TREATMENT EFFECT ONLY) -------------------------------
+
+mcid_threshold <- -1.4   # replace with your study's actual MCID if different
+
+summary_table <- tibble::tibble(
+  Model = c("Informative", "Skeptical"),
+  Prior = c("Normal(-1.92, 2)", "Normal(0, 2)"),
+  Mean = c(mean(draws_inf), mean(draws_skep)),
+  Median = c(median(draws_inf), median(draws_skep)),
+  SD = c(sd(draws_inf), sd(draws_skep)),
+  CI_lower_95 = c(quantile(draws_inf, 0.025), quantile(draws_skep, 0.025)),
+  CI_upper_95 = c(quantile(draws_inf, 0.975), quantile(draws_skep, 0.975)),
+  P_benefit = c(mean(draws_inf < 0), mean(draws_skep < 0)),
+  P_harm = c(mean(draws_inf > 0), mean(draws_skep > 0)),
+  P_clinically_meaningful = c(mean(draws_inf < mcid_threshold), mean(draws_skep < mcid_threshold)),
+  Rhat = c(max(brms::rhat(fit_informative_final)), max(brms::rhat(fit_skeptical_final))),
+  Bulk_ESS = c(summary(fit_informative_final)$fixed["RandomisationiCST", "Bulk_ESS"],
+               summary(fit_skeptical_final)$fixed["RandomisationiCST", "Bulk_ESS"]),
+  Tail_ESS = c(summary(fit_informative_final)$fixed["RandomisationiCST", "Tail_ESS"],
+               summary(fit_skeptical_final)$fixed["RandomisationiCST", "Tail_ESS"])
+) %>%
+  mutate(across(where(is.numeric), ~round(.x, 3)))
+
+print(summary_table)
+write.csv(summary_table, "model1_full_results_table.csv", row.names = FALSE)
+
+results_gt <- summary_table %>%
+  gt() %>%
+  tab_header(
+    title = "Model 1: Treatment Effect on ADAS-Cog by Prior Specification",
+    subtitle = "iCST vs TAU Control, 26-week follow-up"
+  ) %>%
+  fmt_number(columns = c(Mean, Median, SD, CI_lower_95, CI_upper_95,
+                         P_benefit, P_harm, P_clinically_meaningful, Rhat), decimals = 3) %>%
+  fmt_number(columns = c(Bulk_ESS, Tail_ESS), decimals = 0) %>%
+  tab_source_note(source_note = paste0(
+    "P(benefit) = P(treatment effect < 0). P(clinically meaningful) = P(treatment effect < ",
+    mcid_threshold, "). N = ", nrow(dat), "."))
+
+results_gt
+gtsave(results_gt, "model1_full_results_table.png")
+
+# ---- FULL PARAMETER TABLE (ALL COEFFICIENTS, BOTH MODELS) ---------------------
+
+extract_all_params <- function(fit, model_label) {
+  fixed_df <- as.data.frame(summary(fit)$fixed)
+  fixed_df$Parameter <- rownames(fixed_df)
+  sigma_df <- as.data.frame(summary(fit)$spec_pars)
+  sigma_df$Parameter <- rownames(sigma_df)
+  combined <- bind_rows(fixed_df, sigma_df)
+  combined$Model <- model_label
+  combined %>% select(Model, Parameter, Estimate, `l-95% CI`, `u-95% CI`, Rhat, Bulk_ESS, Tail_ESS)
+}
+
+params_informative <- extract_all_params(fit_informative_final, "Informative")
+params_skeptical   <- extract_all_params(fit_skeptical_final, "Skeptical")
+all_params_table <- bind_rows(params_informative, params_skeptical)
+
+all_params_table$Parameter <- dplyr::recode(all_params_table$Parameter,
+                                            "Intercept" = "Intercept", "c_BASELINE_ADAScog" = "Baseline",
+                                            "RandomisationiCST" = "Treatment", "sigma" = "Sigma")
+
+param_order <- c("Intercept", "Baseline", "Sigma", "Treatment")
+all_params_table$Parameter <- factor(all_params_table$Parameter, levels = param_order)
+all_params_table$Model <- factor(all_params_table$Model, levels = c("Informative", "Skeptical"))
+
+all_params_table <- all_params_table %>%
+  arrange(Model, Parameter) %>%
+  mutate(across(c(Estimate, `l-95% CI`, `u-95% CI`, Rhat), ~round(.x, 2)),
+         across(c(Bulk_ESS, Tail_ESS), ~round(.x, 0)))
+
+print(all_params_table)
+write.csv(all_params_table, "model1_full_parameter_table.csv", row.names = FALSE)
+
+params_gt <- all_params_table %>%
+  rename(`Lower CrI` = `l-95% CI`, `Upper CrI` = `u-95% CI`,
+         `Bulk ESS` = Bulk_ESS, `Tail ESS` = Tail_ESS, `R-hat` = Rhat) %>%
+  group_by(Model) %>%
+  gt() %>%
+  tab_header(title = "Table 2", subtitle = "Posterior Estimates of Treatment Effect on ADAS-Cog") %>%
+  fmt_number(columns = c(Estimate, `Lower CrI`, `Upper CrI`), decimals = 2) %>%
+  cols_align(align = "center", columns = everything()) %>%
+  cols_align(align = "left", columns = Parameter)
+
+params_gt
+gtsave(params_gt, "model1_full_parameter_table.png")
