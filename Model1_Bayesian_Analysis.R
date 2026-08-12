@@ -659,15 +659,6 @@ library(dplyr)
 library(tidybayes)
 library(gt)
 
-# ---- IMPORT & PREPARE DATA ----------------------------------------------
-dat <- read_csv("~/Downloads/THESIS COMBINED Complete case 26 week follow up data.csv")
-
-dat$Randomisation <- factor(dat$Randomisation,
-                            levels = c("TAU Control", "iCST"))
-
-table(dat$Randomisation)
-range(dat$ADAS_20_FU2, na.rm = TRUE)
-summary(dat$ADAS_20_FU2)
 
 # ---- TRUNCATED FORMULA ---------------------------------------------------
 # Bounds set to 0-60: true floor is 0, ceiling padded above the
@@ -753,34 +744,57 @@ prior_check_skeptical_final <- brm(
   chains = 4, iter = 1000, seed = 42
 )
 
-# ---- PRIOR + POSTERIOR PREDICTIVE CHECK PLOTS (combined 2x2) ---------------
+## ------------------------------------------------------------------
+## Model 1: Prior and Posterior Predictive Checks
+## Clean side-by-side format (no subtitles), matching reference style.
+## Produces two separate panels: Informative and Skeptical.
+## ------------------------------------------------------------------
+
+library(ggplot2)
+library(patchwork)
+
 
 p_prior_inf <- brms::pp_check(prior_check_informative_final, ndraws = 100) +
-  labs(title = "Prior Predictive Check", subtitle = "Informative prior",
-       x = "ADAS-Cog score", y = "Density") + theme_minimal()
+  labs(title = "Prior Predictive Check",
+       x = "ADAS-Cog score", y = "Density") +
+  theme_minimal()
 
 p_post_inf <- brms::pp_check(fit_informative_final, ndraws = 100) +
-  labs(title = "Posterior Predictive Check", subtitle = "Informative prior",
-       x = "ADAS-Cog score", y = "Density") + theme_minimal()
+  labs(title = "Posterior Predictive Check",
+       x = "ADAS-Cog score", y = "Density") +
+  theme_minimal()
+
+combined_informative <- p_prior_inf | p_post_inf
+
+combined_informative
+
+ggsave("model1_ppc_informative_clean.png", combined_informative,
+       width = 10, height = 5, dpi = 300)
 
 p_prior_skep <- brms::pp_check(prior_check_skeptical_final, ndraws = 100) +
-  labs(title = "Prior Predictive Check", subtitle = "Skeptical prior",
-       x = "ADAS-Cog score", y = "Density") + theme_minimal()
+  labs(title = "Prior Predictive Check",
+       x = "ADAS-Cog score", y = "Density") +
+  theme_minimal()
 
 p_post_skep <- brms::pp_check(fit_skeptical_final, ndraws = 100) +
-  labs(title = "Posterior Predictive Check", subtitle = "Skeptical prior",
-       x = "ADAS-Cog score", y = "Density") + theme_minimal()
+  labs(title = "Posterior Predictive Check",
+       x = "ADAS-Cog score", y = "Density") +
+  theme_minimal()
 
-combined_ppc <- (p_prior_inf | p_post_inf) / (p_prior_skep | p_post_skep) +
-  plot_annotation(
-    title = "Model 1 (Final): Prior and Posterior Predictive Checks",
-    theme = theme(plot.title = element_text(face = "italic", size = 13))
-  )
+combined_skeptical <- p_prior_skep | p_post_skep
 
-combined_ppc
-ggsave("model1_ppc_final_all.png", combined_ppc, width = 10, height = 9, dpi = 300)
+combined_skeptical
 
-# ---- OVERLAID POSTERIOR DISTRIBUTION PLOT -----------------------------------
+ggsave("model1_ppc_skeptical_clean.png", combined_skeptical,
+       width = 10, height = 5, dpi = 300)
+
+## ------------------------------------------------------------------
+## Model 1: Overlaid Posterior Distribution Plot
+## ------------------------------------------------------------------
+
+library(dplyr)
+library(ggplot2)
+library(tidybayes)
 
 draws_informative <- as_draws_df(fit_informative_final) %>%
   select(b_RandomisationiCST) %>%
@@ -793,44 +807,14 @@ draws_skeptical <- as_draws_df(fit_skeptical_final) %>%
 all_draws_m1 <- bind_rows(draws_informative, draws_skeptical)
 all_draws_m1$Prior <- factor(all_draws_m1$Prior, levels = c("Informative", "Skeptical"))
 
+
 prob_labels_m1 <- all_draws_m1 %>%
   group_by(Prior) %>%
   summarise(prob_benefit = mean(b_RandomisationiCST < 0), .groups = "drop") %>%
   mutate(label = paste0(Prior, ": P(benefit) = ",
                         scales::percent(prob_benefit, accuracy = 0.1)))
-
-print(prob_labels_m1)
-
-overlay_plot_m1 <- ggplot(all_draws_m1, aes(x = b_RandomisationiCST, fill = Prior)) +
-  geom_density(alpha = 0.45, color = NA) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "red", linewidth = 0.8) +
-  annotate("text", x = 0.15, y = Inf, label = "No effect",
-           color = "red", hjust = 0, vjust = 1.5, size = 3.5) +
-  annotate("text", x = -4, y = Inf,
-           label = prob_labels_m1$label[prob_labels_m1$Prior == "Informative"],
-           color = "#4E9FDA", hjust = 0, vjust = 3, size = 3.5) +
-  annotate("text", x = -4, y = Inf,
-           label = prob_labels_m1$label[prob_labels_m1$Prior == "Skeptical"],
-           color = "#4CAF50", hjust = 0, vjust = 5, size = 3.5) +
-  scale_fill_manual(values = c("Informative" = "#4E9FDA", "Skeptical" = "#4CAF50"),
-                    labels = c("Informative" = "Informative (\u22121.92)",
-                               "Skeptical" = "Skeptical (0)")) +
-  labs(
-    title = "Posterior distribution of iCST treatment effect on ADAS-Cog",
-    subtitle = "By prior specification",
-    x = "Treatment effect (ADAS-Cog points)", y = "Density",
-    fill = "Prior specification",
-    caption = "Negative values indicate improvement (lower ADAS-Cog = better cognitive function).\nP(benefit) = posterior probability of any beneficial effect of iCST versus TAU Control.\nRed dashed line = no effect (0 points)."
-  ) +
-  theme_minimal() +
-  theme(legend.position = "bottom", plot.caption = element_text(hjust = 0, size = 8, color = "grey40")) +
-  coord_cartesian(clip = "off")
-
-overlay_plot_m1
-ggsave("model1_posterior_treatment_effect_revised.png", overlay_plot_m1,
-       width = 9, height = 6, dpi = 300)
-
-# ---- FOREST PLOT -------------------------------------------------------------
+library(dplyr)
+library(ggplot2)
 
 draws_inf <- as_draws_df(fit_informative_final)$b_RandomisationiCST
 draws_skep <- as_draws_df(fit_skeptical_final)$b_RandomisationiCST
@@ -851,14 +835,96 @@ forest_plot <- ggplot(forest_data, aes(x = Median, y = Model, color = Model)) +
   labs(
     title = "Treatment effect on ADAS-Cog by prior specification",
     subtitle = "Posterior median with 95% credible intervals",
-    x = "Treatment effect (ADAS-Cog points)", y = NULL,
+    x = "Treatment effect (ADAS-Cog points)",
+    y = NULL,
     caption = "Negative values indicate improvement on ADAS-Cog."
   ) +
   theme_minimal() +
   theme(legend.position = "none", plot.caption = element_text(hjust = 1, size = 8, color = "grey40"))
 
 forest_plot
+
 ggsave("model1_forest_plot_revised.png", forest_plot, width = 8, height = 4, dpi = 300)
+print(prob_labels_m1)
+
+
+overlay_plot_m1 <- ggplot(all_draws_m1, aes(x = b_RandomisationiCST,
+                                            fill = Prior, color = Prior)) +
+  geom_density(alpha = 0.4, linewidth = 0.7) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", linewidth = 0.6) +
+  annotate("text", x = 0.15, y = Inf, label = "No effect",
+           color = "black", hjust = 0, vjust = 1.5, size = 3.5) +
+  scale_fill_manual(
+    values = c("Informative" = "#4E9FDA", "Skeptical" = "#4CAF50"),
+    labels = c("Informative" = "Informative (\u22121.92)",
+               "Skeptical" = "Skeptical (0)")
+  ) +
+  scale_color_manual(
+    values = c("Informative" = "#4E9FDA", "Skeptical" = "#4CAF50"),
+    labels = c("Informative" = "Informative (\u22121.92)",
+               "Skeptical" = "Skeptical (0)")
+  ) +
+  labs(
+    x = "Treatment effect (ADAS-Cog points)",
+    y = "Density",
+    fill = "Prior specification",
+    color = "Prior specification"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "right",
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(color = "black"),
+    axis.text = element_text(color = "black")
+  ) +
+  coord_cartesian(clip = "off")
+
+overlay_plot_m1
+
+ggsave("model1_posterior_treatment_effect_matched_style.png", overlay_plot_m1,
+       width = 9, height = 5, dpi = 300)
+
+# ---- FOREST PLOT -------------------------------------------------------------
+
+draws_informative <- as_draws_df(fit_informative_final)$b_RandomisationiCST
+draws_skeptical   <- as_draws_df(fit_skeptical_final)$b_RandomisationiCST
+
+caterpillar_df <- data.frame(
+  model = c("Informative (\u22121.92)", "Skeptical (0)"),
+  median = c(median(draws_informative), median(draws_skeptical)),
+  ci_lower = c(quantile(draws_informative, 0.025), quantile(draws_skeptical, 0.025)),
+  ci_upper = c(quantile(draws_informative, 0.975), quantile(draws_skeptical, 0.975))
+)
+
+caterpillar_df$model <- factor(caterpillar_df$model,
+                               levels = c("Skeptical (0)", "Informative (\u22121.92)"))
+
+ggplot(caterpillar_df, aes(x = median, y = model)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "black", linewidth = 0.6) +
+  geom_errorbarh(aes(xmin = ci_lower, xmax = ci_upper), height = 0.15, linewidth = 0.8, colour = "black") +
+  geom_point(size = 3, colour = "black", fill = "black", shape = 21) +
+  labs(
+    title    = "Treatment Effect on ADAS-Cog by Prior Specification",
+    subtitle = "Posterior median with 95% credible intervals",
+    x        = "Treatment effect (ADAS-Cog points)",
+    y        = "Prior specification",
+    caption  = "Note. Negative values indicate improvement on ADAS-Cog. Error bars represent 95% credible intervals."
+  ) +
+  theme_minimal(base_family = "Arial", base_size = 11) +
+  theme(
+    legend.position   = "none",
+    plot.title        = element_text(face = "bold", hjust = 0, size = 11),
+    plot.subtitle     = element_text(hjust = 0, size = 11, colour = "grey30"),
+    plot.caption      = element_text(hjust = 0, size = 11, colour = "grey30", face = "italic"),
+    axis.title        = element_text(size = 11, face = "bold"),
+    axis.text         = element_text(size = 11, colour = "black"),
+    axis.line         = element_line(colour = "black"),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor  = element_blank(),
+    panel.grid.major.x = element_line(colour = "grey85", linewidth = 0.3)
+  )
+
+ggsave("caterpillar_plot_bw_arial.png", width = 10, height = 5, dpi = 300)
 
 # ---- FULL RESULTS TABLE (TREATMENT EFFECT ONLY) -------------------------------
 
