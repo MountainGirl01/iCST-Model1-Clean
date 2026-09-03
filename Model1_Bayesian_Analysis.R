@@ -1012,3 +1012,83 @@ params_gt <- all_params_table %>%
 
 params_gt
 gtsave(params_gt, "model1_full_parameter_table.png")
+
+## ------------------------------------------------------------------
+## Model 1: v2 Sept Excluded missing cases QCPR for consistent participants across models
+## ------------------------------------------------------------------
+
+# ============================================================
+# Import & Prepare Data
+# ============================================================
+
+dat <- read_csv("~/Downloads/THESIS COMBINED Complete case 26 week follow up data.csv")
+
+dat$Randomisation <- factor(dat$Randomisation,
+                            levels = c("TAU Control", "iCST"))
+
+# Exclude participants missing baseline or follow-up ADAS-Cog,
+# and missing/zero baseline CQ-CPR (0 treated as missing)
+dat <- dat %>%
+  filter(
+    !is.na(c_BASELINE_ADAScog),
+    !is.na(ADAS_20_FU2),
+    !is.na(BASELINE_CQCPR_20),
+    BASELINE_CQCPR_20 != 0
+  )
+
+nrow(dat)
+table(dat$Randomisation)
+
+# ---- TRUNCATED FORMULA ---------------------------------------------------
+
+adas_formula_trunc <- bf(ADAS_20_FU2 | trunc(lb = 0, ub = 60) ~
+                           c_BASELINE_ADAScog + Randomisation)
+
+# ---- FINAL PRIORS ---------------------------------------------------------
+
+priors_informative_final <- c(
+  prior(normal(20, 4),    class = Intercept),
+  prior(normal(0.5, 0.3), class = b, coef = c_BASELINE_ADAScog),
+  prior(normal(-1.92, 2), class = b, coef = RandomisationiCST),
+  prior(normal(9, 3),     class = sigma, lb = 0)
+)
+
+priors_skeptical_final <- c(
+  prior(normal(20, 4),    class = Intercept),
+  prior(normal(0.5, 0.3), class = b, coef = c_BASELINE_ADAScog),
+  prior(normal(0, 2),     class = b, coef = RandomisationiCST),
+  prior(normal(9, 3),     class = sigma, lb = 0)
+)
+
+# ---- FIT BOTH MODELS -------------------------------------------------------
+
+fit_informative_matched <- brm(
+  formula = adas_formula_trunc,
+  data    = dat,
+  family  = gaussian(),
+  prior   = priors_informative_final,
+  chains  = 4,
+  iter    = 4000,
+  warmup  = 2000,
+  cores   = 4,
+  seed    = 42,
+  control = list(adapt_delta = 0.95),
+  file    = "icst_model1_informative_matched_N258"
+)
+
+fit_skeptical_matched <- brm(
+  formula = adas_formula_trunc,
+  data    = dat,
+  family  = gaussian(),
+  prior   = priors_skeptical_final,
+  chains  = 4,
+  iter    = 4000,
+  warmup  = 2000,
+  cores   = 4,
+  seed    = 42,
+  control = list(adapt_delta = 0.95),
+  file    = "icst_model1_skeptical_matched_N258"
+)
+
+summary(fit_informative_matched)
+summary(fit_skeptical_matched)
