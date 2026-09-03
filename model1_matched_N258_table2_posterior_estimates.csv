@@ -1,0 +1,9 @@
+"Model","Parameter","Estimate","l-95% CI","u-95% CI","Rhat","Bulk_ESS","Tail_ESS"
+"Informative","Intercept",21.04,20.04,22.02,1,9916,5827
+"Informative","Baseline",0.98,0.89,1.07,1,9124,5080
+"Informative","Sigma",5.89,5.39,6.45,1,9756,5693
+"Informative","Treatment",-0.88,-2.28,0.54,1,10233,5780
+"Skeptical","Intercept",20.91,19.91,21.91,1,9978,5304
+"Skeptical","Baseline",0.98,0.89,1.07,1,9751,5462
+"Skeptical","Sigma",5.89,5.37,6.45,1,9888,5719
+"Skeptical","Treatment",-0.64,-2,0.76,1,9968,5691
