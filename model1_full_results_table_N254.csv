@@ -1,0 +1,3 @@
+"Model","Prior","Mean","Median","SD","CI_lower_95","CI_upper_95","P_benefit","P_harm","P_clinically_meaningful","Rhat","Bulk_ESS","Tail_ESS"
+"Informative","Normal(-1.92, 2)",-0.86,-0.865,0.634,-2.108,0.376,0.913,0.087,0.193,1.001,10272.244,6179.74
+"Skeptical","Normal(0, 2)",-0.662,-0.649,0.633,-1.923,0.558,0.852,0.148,0.122,1.002,9470.885,5472.473

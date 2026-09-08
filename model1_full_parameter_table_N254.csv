@@ -1,0 +1,9 @@
+"Model","Parameter","Estimate","l-95% CI","u-95% CI","Rhat","Bulk_ESS","Tail_ESS","P_benefit"
+"Informative","Baseline",0.97,0.89,1.05,1,9730,5465,NA
+"Informative","Intercept",20.75,19.82,21.67,1,10540,4966,NA
+"Informative","Sigma",5.26,4.81,5.78,1,10028,5550,NA
+"Informative","Treatment",-0.86,-2.11,0.38,1,10272,6180,0.91
+"Skeptical","Baseline",0.97,0.88,1.05,1,9429,5627,NA
+"Skeptical","Intercept",20.65,19.76,21.55,1,10697,5419,NA
+"Skeptical","Sigma",5.27,4.81,5.77,1,9911,5038,NA
+"Skeptical","Treatment",-0.66,-1.92,0.56,1,9471,5472,0.85
