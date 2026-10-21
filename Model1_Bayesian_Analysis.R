@@ -1684,7 +1684,7 @@ prior_check_skeptical_final <- brm(
 )
 
 # ------------------------------------------------------------------
-# 2. INFORMATIVE - side by side
+# 2. Prior predictive check INFORMATIVE - side by side
 # ------------------------------------------------------------------
 
 p_prior_inf <- brms::pp_check(prior_check_informative_final, ndraws = 100) +
@@ -1702,7 +1702,7 @@ ggsave("model1_ppc_informative_N256.png", combined_informative,
        width = 10, height = 5, dpi = 300)
 
 # ------------------------------------------------------------------
-# 3. SKEPTICAL - side by side
+# 3. Prior predictive check SKEPTICAL - side by side
 # ------------------------------------------------------------------
 
 p_prior_skep <- brms::pp_check(prior_check_skeptical_final, ndraws = 100) +
@@ -1718,6 +1718,10 @@ combined_skeptical
 
 ggsave("model1_ppc_skeptical_N256.png", combined_skeptical,
        width = 10, height = 5, dpi = 300)
+
+# ------------------------------------------------------------------
+# 4. Traceplots
+# ------------------------------------------------------------------
 
 library(bayesplot)
 library(ggplot2)
@@ -1735,6 +1739,28 @@ trace_plot_inf <- mcmc_trace(fit_informative_final, pars = c("b_Intercept", "b_c
 trace_plot_inf
 
 ggsave("model1_traceplots_informative_N256.png", trace_plot_inf, width = 10, height = 8, dpi = 300)
+
+
+library(bayesplot)
+library(ggplot2)
+
+trace_plot_inf <- mcmc_trace(fit_informative_final, pars = c("b_Intercept", "b_c_BASELINE_ADAScog",
+                                                             "b_RandomisationiCST", "sigma")) +
+  theme_minimal(base_family = "Arial", base_size = 11) +
+  theme(
+    axis.title = element_text(size = 11, face = "bold"),
+    axis.text = element_text(size = 11, colour = "black"),
+    strip.text = element_text(size = 11, face = "bold"),
+    legend.position = "right"
+  )
+
+trace_plot_inf
+
+ggsave("model1_traceplots_informative_N256.png", trace_plot_inf, width = 10, height = 8, dpi = 300)
+
+# ------------------------------------------------------------------
+# 5. Caterpillar Plot
+# ------------------------------------------------------------------
 
 library(dplyr)
 library(ggplot2)
@@ -1772,6 +1798,10 @@ ggplot(caterpillar_df, aes(x = median, y = model)) +
   )
 
 ggsave("model1_forest_plot_N256.png", width = 10, height = 5, dpi = 300)
+
+# ------------------------------------------------------------------
+# 6. Overlay
+# ------------------------------------------------------------------
 
 library(dplyr)
 library(ggplot2)
@@ -1829,3 +1859,411 @@ overlay_plot_m1 <- ggplot(all_draws_m1, aes(x = b_RandomisationiCST,
 overlay_plot_m1
 
 ggsave("model1_posterior_overlay_N256.png", overlay_plot_m1, width = 9, height = 5, dpi = 300)
+
+## ------------------------------------------------------------------
+## Model 1: Triplot (informative prior), colour, APA 7 style
+## Blue = informative prior, red = likelihood, green = posterior
+## Requires these objects in your R session:
+##   fit_informative_final  (brms fit, N = 256)
+##   dat                    (the N = 256 analysis dataset)
+## ------------------------------------------------------------------
+
+library(ggplot2)
+library(dplyr)
+library(brms)
+
+# 1. Posterior: draws from the informative-prior model (N = 256)
+post_draws <- as_draws_df(fit_informative_final)$b_RandomisationiCST
+
+# 2. Informative prior: Normal(-1.92, 2)
+prior_mean <- -1.92
+prior_sd   <- 2
+
+# 3. Likelihood: normal curve centred on the maximum likelihood estimate
+lm_fit  <- lm(ADAS_20_FU2 ~ c_BASELINE_ADAScog + Randomisation, data = dat)
+lik_est <- coef(summary(lm_fit))["RandomisationiCST", "Estimate"]
+lik_se  <- coef(summary(lm_fit))["RandomisationiCST", "Std. Error"]
+
+# 4. Common grid
+x <- seq(-6, 4, length.out = 1000)
+
+dist_labels <- c("Informative prior", "Likelihood", "Posterior")
+
+tri_df <- data.frame(
+  x = rep(x, 3),
+  density = c(
+    dnorm(x, prior_mean, prior_sd),
+    dnorm(x, lik_est, lik_se),
+    density(post_draws, from = min(x), to = max(x), n = length(x))$y
+  ),
+  Distribution = factor(rep(dist_labels, each = length(x)), levels = dist_labels)
+)
+
+# 5. APA 7 triplot in colour
+triplot_apa_colour <- ggplot(tri_df, aes(x = x, y = density, colour = Distribution)) +
+  geom_line(linewidth = 0.9) +
+  scale_colour_manual(values = c("Informative prior" = "#4E9FDA",
+                                 "Likelihood"        = "#D32F2F",
+                                 "Posterior"         = "#4CAF50")) +
+  labs(x = "Treatment effect (ADAS-Cog points)", y = "Density", colour = NULL) +
+  theme_classic(base_family = "Arial", base_size = 11) +
+  theme(
+    text = element_text(family = "Arial", size = 11, colour = "black"),
+    axis.title = element_text(size = 11),
+    axis.text = element_text(size = 11, colour = "black"),
+    axis.line = element_line(colour = "black", linewidth = 0.5),
+    axis.ticks = element_line(colour = "black"),
+    panel.grid = element_blank(),
+    panel.border = element_blank(),
+    legend.position = "top",
+    legend.text = element_text(size = 11),
+    legend.key.width = unit(1.5, "cm")
+  )
+
+triplot_apa_colour
+
+ggsave("model1_triplot_informative_N256_APA_colour.png", triplot_apa_colour,
+       width = 6.5, height = 4, dpi = 300)
+
+
+  ## ------------------------------------------------------------------
+> ## Descriptive statistics: BASELINE_ADAS_20
+  > ## Requires `dat` (the N = 256 analysis dataset) in your R session
+  > ## ------------------------------------------------------------------
+> 
+  > library(dplyr)
+> 
+  > describe_adas <- function(d) {
+    +     d %>%
+      +         summarise(
+        +             n       = sum(!is.na(BASELINE_ADAS_20)),
+        +             missing = sum(is.na(BASELINE_ADAS_20)),
+        +             M       = mean(BASELINE_ADAS_20, na.rm = TRUE),
+        +             SD      = sd(BASELINE_ADAS_20, na.rm = TRUE),
+        +             Mdn     = median(BASELINE_ADAS_20, na.rm = TRUE),
+        +             Q1      = quantile(BASELINE_ADAS_20, 0.25, na.rm = TRUE),
+        +             Q3      = quantile(BASELINE_ADAS_20, 0.75, na.rm = TRUE),
+        +             Min     = min(BASELINE_ADAS_20, na.rm = TRUE),
+        +             Max     = max(BASELINE_ADAS_20, na.rm = TRUE),
+        +             .groups = "drop"
+        +         ) %>%
+      +         mutate(across(c(M, SD, Mdn, Q1, Q3, Min, Max), ~ round(.x, 2)))
+    + }
+> 
+  > # 1. Whole sample
+  > overall <- describe_adas(dat) %>% mutate(Group = "Total", .before = 1)
+> 
+  > # 2. By trial arm
+  > by_arm <- dat %>%
+  +     group_by(Group = as.character(Randomisation)) %>%
+  +     describe_adas()
+> 
+  > adas_desc <- bind_rows(by_arm, overall)
+> print(adas_desc)
+
+## ------------------------------------------------------------------
+> ## Descriptive statistics: BASELINE_CQCPR_20
+  > ## Requires `dat` (the N = 256 analysis dataset) in your R session
+  > ## ------------------------------------------------------------------
+> 
+  > library(dplyr)
+> 
+  > # Skewness as reported by SPSS (adjusted Fisher-Pearson, G1)
+  > skew_spss <- function(x) {
+    +     x <- x[!is.na(x)]; n <- length(x)
+    +     g1 <- (sum((x - mean(x))^3) / n) / (sum((x - mean(x))^2) / n)^(3/2)
+    +     g1 * sqrt(n * (n - 1)) / (n - 2)
+    + }
+> 
+  > # Standard error of skewness
+  > skew_se <- function(x) {
+    +     n <- sum(!is.na(x))
+    +     sqrt(6 * n * (n - 1) / ((n - 2) * (n + 1) * (n + 3)))
+    + }
+> 
+  > describe_cqcpr <- function(d) {
+    +     d %>%
+      +         summarise(
+        +             n       = sum(!is.na(BASELINE_CQCPR_20)),
+        +             missing = sum(is.na(BASELINE_CQCPR_20)),
+        +             M       = mean(BASELINE_CQCPR_20, na.rm = TRUE),
+        +             SD      = sd(BASELINE_CQCPR_20, na.rm = TRUE),
+        +             Mdn     = median(BASELINE_CQCPR_20, na.rm = TRUE),
+        +             Q1      = quantile(BASELINE_CQCPR_20, 0.25, na.rm = TRUE),
+        +             Q3      = quantile(BASELINE_CQCPR_20, 0.75, na.rm = TRUE),
+        +             Min     = min(BASELINE_CQCPR_20, na.rm = TRUE),
+        +             Max     = max(BASELINE_CQCPR_20, na.rm = TRUE),
+        +             Skew    = skew_spss(BASELINE_CQCPR_20),
+        +             SE_skew = skew_se(BASELINE_CQCPR_20),
+        +             .groups = "drop"
+        +         ) %>%
+      +         mutate(z_skew = Skew / SE_skew) %>%
+      +         mutate(across(c(M, SD, Mdn, Q1, Q3, Min, Max, Skew, SE_skew, z_skew), ~ round(.x, 2)))
+    + }
+> 
+  > # 1. Whole sample
+  > overall <- describe_cqcpr(dat) %>% mutate(Group = "Total", .before = 1)
+> 
+  > # 2. By trial arm
+  > by_arm <- dat %>%
+  +     group_by(Group = as.character(Randomisation)) %>%
+  +     describe_cqcpr()
+> 
+  > cqcpr_desc <- bind_rows(by_arm, overall)
+> print(cqcpr_desc)
+
+library(dplyr)
+
+# ---- 0. Check the raw gender codes first ----
+table(dat$qRelGenP, useNA = "ifany")
+table(dat$qRelGenC, useNA = "ifany")
+
+# ---- 1. Label gender (1 = Male, 2 = Female) ----
+dat <- dat %>%
+  mutate(
+    gender_P = factor(qRelGenP, levels = c(1, 2), labels = c("Male", "Female")),
+    gender_C = factor(qRelGenC, levels = c(1, 2), labels = c("Male", "Female"))
+  )
+
+# ---- 2. Age descriptives ----
+describe_age <- function(d, var) {
+  d %>%
+    summarise(
+      n      = sum(!is.na({{ var }})),
+      Mean   = mean({{ var }}, na.rm = TRUE),
+      Median = median({{ var }}, na.rm = TRUE),
+      SD     = sd({{ var }}, na.rm = TRUE),
+      Min    = min({{ var }}, na.rm = TRUE),
+      Max    = max({{ var }}, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(across(c(Mean, Median, SD, Min, Max), ~ round(.x, 2)))
+}
+
+age_table <- function(var, who) {
+  bind_rows(
+    dat %>% group_by(Group = as.character(Randomisation)) %>% describe_age({{ var }}),
+    describe_age(dat, {{ var }}) %>% mutate(Group = "Total", .before = 1)
+  ) %>%
+    mutate(Participant = who, .before = 1)
+}
+
+age_desc <- bind_rows(
+  age_table(cRelAgeP, "Person with dementia"),
+  age_table(cRelAgeC, "Caregiver")
+)
+print(as.data.frame(age_desc))
+View(age_desc, "Age")
+
+# ---- 3. Gender frequencies ----
+gender_table <- function(var, who) {
+  freq <- function(d) {
+    d %>%
+      count(Gender = {{ var }}) %>%
+      mutate(
+        pct_valid = ifelse(is.na(Gender), NA,
+                           round(100 * n / sum(n[!is.na(Gender)]), 1)),
+        Gender = ifelse(is.na(Gender), "Missing", as.character(Gender))
+      )
+  }
+  bind_rows(
+    dat %>% group_by(Group = as.character(Randomisation)) %>% freq(),
+    freq(dat) %>% mutate(Group = "Total", .before = 1)
+  ) %>%
+    ungroup() %>%
+    mutate(Participant = who, .before = 1)
+}
+
+gender_freq <- bind_rows(
+  gender_table(gender_P, "Person with dementia"),
+  gender_table(gender_C, "Caregiver")
+)
+print(as.data.frame(gender_freq))
+View(gender_freq, "Gender")
+
+# ---- 4. Save ----
+write.csv(age_desc,    "age_descriptives.csv",   row.names = FALSE)
+write.csv(gender_freq, "gender_frequencies.csv", row.names = FALSE)
+
+library(dplyr)
+
+# ---- 0. Frequency helper: n and % of valid responses, by arm and total ----
+freq_table <- function(var, who) {
+  freq <- function(d) {
+    d %>%
+      count(Category = {{ var }}) %>%
+      mutate(
+        pct_valid = ifelse(is.na(Category), NA,
+                           round(100 * n / sum(n[!is.na(Category)]), 1)),
+        Category = ifelse(is.na(Category), "Missing", as.character(Category))
+      )
+  }
+  bind_rows(
+    dat %>% group_by(Group = as.character(Randomisation)) %>% freq(),
+    freq(dat) %>% mutate(Group = "Total", .before = 1)
+  ) %>%
+    ungroup() %>%
+    mutate(Variable = who, .before = 1)
+}
+
+# ---- 1. Raw codes (check against your codebook) ----
+raw_freq <- bind_rows(
+  freq_table(qRelationship, "Relationship (raw code)"),
+  freq_table(cRelEthP,      "Ethnicity PwD (raw code)"),
+  freq_table(cRelEthC,      "Ethnicity caregiver (raw code)")
+)
+print(as.data.frame(raw_freq))
+
+# ---- 2. Labels ----
+eth_codes  <- c(1, 2, 3, 4, 5, 6, 13, 15, 22)
+eth_labels <- c("White (not specified)", "White British", "White Irish",
+                "Other White background", "Black or Black British (not specified)",
+                "Caribbean", "Other mixed background", "Indian",
+                "Not stated / do not wish to specify")
+
+dat <- dat %>%
+  mutate(
+    relationship_grp = factor(
+      qRelationship,
+      levels = c(1, 2, 3, 4, 5, 6, 7, 9),
+      labels = c("Wife/husband (spouse)", "Partner", "Son/daughter",
+                 "Son/daughter-in-law", "Brother/sister", "Other relative",
+                 "Friend", "Other")
+    ),
+    ethnicity_P = coalesce(eth_labels[match(cRelEthP, eth_codes)],
+                           ifelse(is.na(cRelEthP), NA, paste("Code", cRelEthP))),
+    ethnicity_C = coalesce(eth_labels[match(cRelEthC, eth_codes)],
+                           ifelse(is.na(cRelEthC), NA, paste("Code", cRelEthC)))
+  ) %>%
+  mutate(across(c(ethnicity_P, ethnicity_C),
+                ~ factor(.x, levels = unique(c(eth_labels,
+                                               sort(unique(.x[!.x %in% eth_labels])))))))
+
+# ---- 3. Table 1: relationship type ----
+relationship_freq <- freq_table(relationship_grp, "Relationship to person with dementia")
+
+# ---- 4. Table 2: ethnicity ----
+ethnicity_freq <- bind_rows(
+  freq_table(ethnicity_P, "Person with dementia"),
+  freq_table(ethnicity_C, "Caregiver")
+) %>%
+  rename(Participant = Variable)
+
+print(as.data.frame(relationship_freq))
+print(as.data.frame(ethnicity_freq))
+
+# Each opens in its own RStudio tab
+View(relationship_freq, "Relationship")
+View(ethnicity_freq,    "Ethnicity")
+
+# ---- 5. Save: one Excel workbook, a tab for each table ----
+if (!requireNamespace("writexl", quietly = TRUE)) install.packages("writexl")
+writexl::write_xlsx(
+  list(
+    Relationship = relationship_freq,
+    Ethnicity    = ethnicity_freq,
+    `Raw codes`  = raw_freq
+  ),
+  "relationship_ethnicity_tables.xlsx"
+)
+
+---- 
+  library(dplyr)
+
+# ---- 0. Find the baseline MMSE column (ignores capitals) ----
+mmse_cols <- grep("mmse", names(dat), ignore.case = TRUE, value = TRUE)
+print(mmse_cols)
+
+baseline_cols <- grep("base", mmse_cols, ignore.case = TRUE, value = TRUE)
+mmse_var <- if (length(baseline_cols) >= 1) baseline_cols[1] else mmse_cols[1]
+
+if (is.na(mmse_var)) {
+  stop("No column with 'mmse' in its name was found in dat. ",
+       "Run names(dat) to find the MMSE column, then set mmse_var by hand, ",
+       "e.g. mmse_var <- \"YOUR_COLUMN_NAME\"")
+}
+message("Using column: ", mmse_var)
+
+dat <- dat %>% mutate(mmse = .data[[mmse_var]])
+
+# ---- 1. Skewness (SPSS formula) and its SE ----
+skew_spss <- function(x) {
+  x <- x[!is.na(x)]; n <- length(x)
+  g1 <- (sum((x - mean(x))^3) / n) / (sum((x - mean(x))^2) / n)^(3/2)
+  g1 * sqrt(n * (n - 1)) / (n - 2)
+}
+skew_se <- function(x) {
+  n <- sum(!is.na(x))
+  sqrt(6 * n * (n - 1) / ((n - 2) * (n + 1) * (n + 3)))
+}
+
+# ---- 2. Descriptives ----
+describe_mmse <- function(d) {
+  d %>%
+    summarise(
+      n       = sum(!is.na(mmse)),
+      Missing = sum(is.na(mmse)),
+      Mean    = mean(mmse, na.rm = TRUE),
+      Median  = median(mmse, na.rm = TRUE),
+      SD      = sd(mmse, na.rm = TRUE),
+      Min     = min(mmse, na.rm = TRUE),
+      Max     = max(mmse, na.rm = TRUE),
+      Skew    = skew_spss(mmse),
+      SE_skew = skew_se(mmse),
+      .groups = "drop"
+    ) %>%
+    mutate(across(c(Mean, Median, SD, Min, Max, Skew, SE_skew), ~ round(.x, 2)))
+}
+
+mmse_desc <- bind_rows(
+  dat %>% group_by(Group = as.character(Randomisation)) %>% describe_mmse(),
+  describe_mmse(dat) %>% mutate(Group = "Total", .before = 1)
+)
+
+# ---- 3. Frequencies ----
+freq_table <- function(var) {
+  freq <- function(d) {
+    d %>%
+      count(Category = {{ var }}) %>%
+      mutate(
+        pct_valid = ifelse(is.na(Category), NA,
+                           round(100 * n / sum(n[!is.na(Category)]), 1)),
+        Category = ifelse(is.na(Category), "Missing", as.character(Category))
+      )
+  }
+  bind_rows(
+    dat %>% group_by(Group = as.character(Randomisation)) %>% freq(),
+    freq(dat) %>% mutate(Group = "Total", .before = 1)
+  ) %>%
+    ungroup()
+}
+
+# 3a. Every MMSE score
+mmse_score_freq <- freq_table(mmse) %>% rename(MMSE_score = Category)
+
+# 3b. MMSE bands: 17 or less, 18-23, 24 and above
+dat <- dat %>%
+  mutate(mmse_band = cut(mmse,
+                         breaks = c(-Inf, 17, 23, Inf),
+                         labels = c("17 or less", "18-23", "24 and above")))
+mmse_band_freq <- freq_table(mmse_band) %>% rename(Severity = Category)
+
+# ---- 4. Show ----
+print(as.data.frame(mmse_desc))
+print(as.data.frame(mmse_band_freq))
+print(as.data.frame(mmse_score_freq))
+
+View(mmse_desc,       "MMSE descriptives")
+View(mmse_band_freq,  "MMSE bands")
+View(mmse_score_freq, "MMSE scores")
+
+# ---- 5. Save: one workbook, one tab per table ----
+if (!requireNamespace("writexl", quietly = TRUE)) install.packages("writexl")
+writexl::write_xlsx(
+  list(
+    Descriptives = mmse_desc,
+    Bands        = mmse_band_freq,
+    Scores       = mmse_score_freq
+  ),
+  "baseline_MMSE_tables.xlsx"
+)

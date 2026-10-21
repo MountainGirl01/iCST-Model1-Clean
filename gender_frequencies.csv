@@ -1,0 +1,13 @@
+"Participant","Group","Gender","n","pct_valid"
+"Person with dementia","TAU Control","Male",69,53.5
+"Person with dementia","TAU Control","Female",60,46.5
+"Person with dementia","iCST","Male",69,54.3
+"Person with dementia","iCST","Female",58,45.7
+"Person with dementia","Total","Male",138,53.9
+"Person with dementia","Total","Female",118,46.1
+"Caregiver","TAU Control","Male",37,28.7
+"Caregiver","TAU Control","Female",92,71.3
+"Caregiver","iCST","Male",31,24.4
+"Caregiver","iCST","Female",96,75.6
+"Caregiver","Total","Male",68,26.6
+"Caregiver","Total","Female",188,73.4

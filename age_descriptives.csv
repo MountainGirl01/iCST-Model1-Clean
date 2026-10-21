@@ -1,0 +1,7 @@
+"Participant","Group","n","Mean","Median","SD","Min","Max"
+"Person with dementia","TAU Control",129,77.75,79,6.83,60,93
+"Person with dementia","iCST",127,78.23,79,7.32,63,96
+"Person with dementia","Total",256,77.99,79,7.07,60,96
+"Caregiver","TAU Control",128,66.1,69,12.35,23,91
+"Caregiver","iCST",127,66.16,68,13.07,32,88
+"Caregiver","Total",255,66.13,69,12.69,23,91
